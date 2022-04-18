@@ -62,13 +62,12 @@ class SoftDecisionTree(nn.Module):
         leaf_nodes_prob = torch.vstack(leaf_nodes_prob).T
         # (batch_size, num_leaf_nodes)
 
-        softmax_leaf_nodes_prob = torch.softmax(leaf_nodes_prob, dim=-1)
         onehot_leaf_nodes_prob = F.one_hot(
             torch.argmax(leaf_nodes_prob, dim=-1),
             num_classes=leaf_nodes_prob.shape[-1]
         )
 
-        return softmax_leaf_nodes_prob - (softmax_leaf_nodes_prob - onehot_leaf_nodes_prob).detach()
+        return leaf_nodes_prob - (leaf_nodes_prob - onehot_leaf_nodes_prob).detach()
 
     def _dist(self):
         softmax_dist = torch.softmax(self.logits, dim=-1)
