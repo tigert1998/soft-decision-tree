@@ -5,6 +5,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class ArgMax(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        idx = torch.argmax(input, dim=-1)
+        return F.one_hot(idx, num_classes=input.shape[-1]).to(torch.float32)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output
+
+
 class SoftDecisionTree(nn.Module):
     def __init__(self, num_features, height, num_classes):
         super().__init__()
@@ -62,20 +73,10 @@ class SoftDecisionTree(nn.Module):
         leaf_nodes_prob = torch.vstack(leaf_nodes_prob).T
         # (batch_size, num_leaf_nodes)
 
-        onehot_leaf_nodes_prob = F.one_hot(
-            torch.argmax(leaf_nodes_prob, dim=-1),
-            num_classes=leaf_nodes_prob.shape[-1]
-        )
-
-        return leaf_nodes_prob - (leaf_nodes_prob - onehot_leaf_nodes_prob).detach()
+        return ArgMax.apply(leaf_nodes_prob)
 
     def _dist(self):
-        softmax_dist = torch.softmax(self.logits, dim=-1)
-        onehot_dist = F.one_hot(
-            torch.argmax(self.logits, dim=-1),
-            num_classes=self.logits.shape[-1]
-        )
-        return softmax_dist - (softmax_dist - onehot_dist).detach()
+        return ArgMax.apply(self.logits)
 
     def forward(self, x):
         dist = self._dist()
