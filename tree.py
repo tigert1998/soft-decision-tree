@@ -58,6 +58,7 @@ class SoftDecisionTree(nn.Module):
 
         leaf_nodes_prob = []
         for i in range(1 << self.height):
+            # enumerate all leaf nodes
             prob = 1
             index = 0
             for j in range(self.height - 1, -1, -1):
@@ -70,17 +71,21 @@ class SoftDecisionTree(nn.Module):
             assert i == index
             leaf_nodes_prob.append(prob)
 
-        leaf_nodes_prob = torch.vstack(leaf_nodes_prob).T
         # (batch_size, num_leaf_nodes)
-
-        return ArgMax.apply(leaf_nodes_prob)
+        return torch.vstack(leaf_nodes_prob).T
 
     def _dist(self):
-        return ArgMax.apply(self.logits)
+        return F.softmax(self.logits, dim=-1)
 
     def forward(self, x):
         dist = self._dist()
         # (num_leaf_nodes, num_classes)
         path_prob = self._path_prob(x)
         # (batch_size, num_leaf_nodes)
-        return torch.matmul(path_prob, dist)
+
+        # (batch_size, num_classes)
+        return path_prob.max(dim=-1).values.unsqueeze(-1) * dist.gather(
+            dim=0,
+            index=path_prob.argmax(dim=-1, keepdim=True)
+            .repeat(1, self.num_classes)
+        )
